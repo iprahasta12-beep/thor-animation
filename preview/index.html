@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Spine preview</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#121725;--panel:#171d2e;--line:#262e45;--txt:#dfe5f3;--mut:#8a94ad;--acc:#3d7bff;--on:#2a3a66;--ok:#2ecc71;--todo:#59617a;--p1:#e2564f;--p2:#e0a93a;--p3:#5aa0ff}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:13px/1.35 Inter,system-ui,Segoe UI,Arial,sans-serif;overflow:hidden}
+#app{display:grid;grid-template-columns:360px 1fr;height:100%}
+#left{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.sec{padding:10px 14px;border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:17px;color:#ffb400}h1 span{color:var(--txt);font-weight:600}
+.sub{color:var(--mut);font-size:12px;margin-top:2px}.stats{margin-top:6px;font-size:12px}.stats b{color:#fff}
+button{background:#222a40;color:var(--txt);border:1px solid #33405f;border-radius:6px;padding:5px 10px;font:inherit;cursor:pointer}
+button:hover{border-color:#4d5f8c}button.on{background:var(--on);border-color:var(--acc)}button:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.row+.row{margin-top:7px}
+label{display:flex;align-items:center;gap:6px;color:var(--mut)}input[type=range]{flex:1;accent-color:var(--acc);min-width:60px}
+input[type=number]{width:64px;background:#10151f;border:1px solid #33405f;color:var(--txt);border-radius:5px;padding:3px 5px;font:inherit}
+.val{width:46px;text-align:right;color:var(--txt);font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.lab{font-size:11px;letter-spacing:.08em;color:var(--mut);text-transform:uppercase;margin:0 0 6px}
+#list{flex:1;overflow:auto;min-height:80px}
+.grp{padding:10px 14px 4px;font-size:11px;letter-spacing:.08em;color:var(--mut)}
+.it{display:grid;grid-template-columns:22px 1fr auto 12px;gap:6px;align-items:center;padding:7px 14px;cursor:pointer;border-left:3px solid transparent}
+.it:hover{background:#1d2438}.it.sel{background:#232c48;border-left-color:#ffb400}.it.todo{opacity:.55}.it.lay.act{background:#1e2a3f}
+.it .n{color:var(--mut);font-size:11px;text-align:right}.it .nm{font-family:ui-monospace,Menlo,monospace}.it .tr{color:var(--mut);font-size:11px}
+.pr{font-size:10px;padding:1px 5px;border-radius:4px;border:1px solid}.pr.P1{color:var(--p1);border-color:#6b2a2a}.pr.P2{color:var(--p2);border-color:#6b5420}.pr.P3{color:var(--p3);border-color:#24406b}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}.todo .dot{background:var(--todo)}
+#detail{padding:10px 14px;border-top:1px solid var(--line);font-size:12px;min-height:84px}#detail .nm{font-family:ui-monospace,monospace;color:#ffb400}#detail .w{color:var(--mut);margin-top:3px}
+#stage{position:relative;overflow:hidden;background:#0e121c}#stage canvas{display:block}
+#lay{position:absolute;top:10px;right:10px;display:flex;gap:6px;z-index:5}
+#evlog{position:absolute;left:12px;bottom:10px;display:flex;flex-direction:column-reverse;gap:4px;z-index:5;pointer-events:none}
+.evp{background:#3a2c08;color:#ffcf4a;border:1px solid #6b5212;border-radius:5px;padding:3px 8px;font-family:ui-monospace,monospace;font-size:12px}
+#hint{position:absolute;right:12px;bottom:10px;color:#5d6785;font-size:12px;z-index:5}
+#err{position:absolute;inset:auto 20px 50px 20px;background:#3a1414;border:1px solid #823;color:#ffb3b3;padding:10px;border-radius:6px;white-space:pre-wrap;display:none;z-index:6}
+#drop{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#0e121ccc;border:3px dashed var(--acc);font-size:18px;z-index:9}
+input[type=file]{display:none}
+</style></head>
+<body><div id="app">
+<aside id="left">
+  <div class="sec"><h1 id="title">Character <span>· animation</span></h1>
+    <div class="sub" id="src">baked: data.js</div>
+    <div class="stats" id="stats"></div>
+    <div class="row" style="margin-top:8px"><button id="ldExp" title="Pick .json/.skel + .atlas + .png from a Spine export">Load export…</button><button id="ldBg" title="Background image for this layout">Load BG…</button><button id="clrBg">Clear BG</button></div>
+    <input id="fExp" type="file" multiple accept=".json,.skel,.atlas,.txt,.png,.webp,.jpg"><input id="fBg" type="file" accept="image/*">
+  </div>
+  <div class="sec"><p class="lab">Playback</p>
+    <div class="row"><button id="play" style="width:96px;white-space:nowrap">❚❚ Pause</button><button id="restart" title="Restart">⟲</button><button id="loop" class="on">Loop</button><button id="ret" title="One-shots go back to idle">→ idle after</button></div>
+    <div class="row"><input id="scrub" type="range" min="0" max="1" step="0.001" value="0"><span class="val" id="time" style="width:92px">0.00 / 0.00s</span></div>
+    <div class="row"><label style="flex:1">Speed<input id="speed" type="range" min="0.1" max="2" step="0.05" value="1"><span class="val" id="speedv">1.00×</span></label></div>
+    <div class="row"><label style="flex:1">Mix<input id="mix" type="range" min="0" max="0.8" step="0.05" value="0.2"><span class="val" id="mixv">0.20s</span></label></div>
+  </div>
+  <div class="sec"><p class="lab">Character</p>
+    <div class="row"><label style="flex:1">Size<input id="cS" type="range" min="0.05" max="1.5" step="0.005"></label><input id="cSn" type="number" min="0.02" max="3" step="0.01"></div>
+    <div class="row"><label>X<input id="cX" type="number" step="1"></label><label>Y<input id="cY" type="number" step="1"></label><button id="cFlip" title="Mirror">Flip</button></div>
+    <div class="row"><button id="cReset">Reset</button><button id="cCopy" title="Copy placement JSON for the game">Copy JSON</button><span class="sub" style="margin:0">drag = move · wheel = size</span></div>
+  </div>
+  <div class="sec row" id="filter"><button data-f="all" class="on">All</button><button data-f="ready">Ready</button><button data-f="todo">To do</button><button data-f="P1">P1</button><button data-f="P2">P2</button><button data-f="P3">P3</button></div>
+  <div id="list"></div>
+  <div id="detail"></div>
+</aside>
+<main id="stage">
+  <div id="lay"><button id="lyL" class="on">Landscape</button><button id="lyP">Portrait</button></div>
+  <div id="evlog"></div><div id="hint">drag char = move · wheel = size · stays inside the canvas</div>
+  <div id="err"></div><div id="drop">Drop .json/.skel + .atlas + .png (or an image = background)</div>
+</main></div>
+<script src="lib/pixi.min.js"></script>
+<script src="lib/spine-pixi-v8.min.js"></script>
+<script src="animations.js" onerror="window.ANIM_SPEC=null"></script>
+<script src="data.js" onerror="window.SPINE_DATA=null"></script>
+<script>
+(async () => {
+const $ = s => document.querySelector(s);
+const SPEC = window.ANIM_SPEC || { title: 'Character', groups: [] };
+const FR = { landscape: [1920, 1080], portrait: [1080, 1920] };
+const KEY = 'spv_' + (SPEC.title || 'char');
+const S = { sel: null, loop: true, ret: false, speed: 1, mix: 0.2, paused: false, filter: 'all', scrub: false, layers: {} };
+let sp = null, sd = null, LAY = 'landscape';
+const DEF = SPEC.placement || { landscape: { x: 560, y: 1020, scale: 0.5, flip: false }, portrait: { x: 540, y: 1760, scale: 0.75, flip: false } };
+let P = JSON.parse(JSON.stringify(DEF));
+try { const v = JSON.parse(localStorage.getItem(KEY + '_place') || 'null'); if (v && v.landscape) P = v; LAY = localStorage.getItem(KEY + '_lay') || LAY; } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY + '_place', JSON.stringify(P)); localStorage.setItem(KEY + '_lay', LAY); } catch (e) {} };
+const BG = { landscape: (window.BG_DATA || {}).landscape || null, portrait: (window.BG_DATA || {}).portrait || null };
+
+// ---------- pixi ----------
+const app = new PIXI.Application();
+await app.init({ resizeTo: $('#stage'), background: 0x0e121c, antialias: true, autoDensity: true, resolution: Math.min(devicePixelRatio, 2) });
+$('#stage').prepend(app.canvas);
+const world = new PIXI.Container(), frame = new PIXI.Graphics(), bgLayer = new PIXI.Container(), charLayer = new PIXI.Container(), clip = new PIXI.Graphics(), border = new PIXI.Graphics();
+world.addChild(frame, bgLayer, charLayer, clip, border); bgLayer.mask = clip; app.stage.addChild(world);
+const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+async function drawFrame() {
+  const [w, h] = FR[LAY];
+  frame.clear().rect(0, 0, w, h).fill(0x2b303b);                       // blank canvas when no background
+  clip.clear().rect(0, 0, w, h).fill(0xffffff); border.clear().rect(0, 0, w, h).stroke({ width: 2, color: 0x3a4566 });
+  bgLayer.removeChildren();
+  if (BG[LAY]) {
+    const tex = PIXI.Texture.from(new PIXI.ImageSource({ resource: await loadImg(BG[LAY]) }));
+    const s = new PIXI.Sprite(tex), k = Math.max(w / tex.width, h / tex.height);  // cover
+    s.scale.set(k); s.position.set((w - tex.width * k) / 2, (h - tex.height * k) / 2); bgLayer.addChild(s);
+  }
+  $('#lyL').classList.toggle('on', LAY === 'landscape'); $('#lyP').classList.toggle('on', LAY === 'portrait');
+}
+function fit() {
+  const [w, h] = FR[LAY], W = app.screen.width, H = app.screen.height, k = Math.min(W / w, H / h) * 0.94;
+  world.scale.set(k); world.position.set((W - w * k) / 2, (H - h * k) / 2);
+}
+function clampIn(p) {                       // keep the whole character inside the canvas frame
+  if (!sd) return; const [w, h] = FR[LAY];
+  const bw = sd.width || 1, bh = sd.height || 1;
+  p.scale = Math.max(0.02, Math.min(p.scale, w / bw, h / bh));
+  const s = p.scale, lx = p.flip ? -(sd.x + bw) : sd.x;      // skeleton bounds (y-up) -> canvas px around the feet point
+  const minX = -lx * s, maxX = w - (lx + bw) * s, minY = (sd.y + bh) * s, maxY = h + sd.y * s;
+  p.x = Math.min(Math.max(p.x, minX), maxX); p.y = Math.min(Math.max(p.y, minY), maxY);
+}
+function place() {
+  if (!sp) return; const p = P[LAY]; clampIn(p);
+  sp.position.set(p.x, p.y); sp.scale.set(p.scale * (p.flip ? -1 : 1), p.scale);
+  $('#cS').value = p.scale; $('#cSn').value = (+p.scale).toFixed(3); $('#cX').value = Math.round(p.x); $('#cY').value = Math.round(p.y);
+  $('#cFlip').classList.toggle('on', !!p.flip); save();
+}
+new ResizeObserver(() => fit()).observe($('#stage'));
+
+// ---------- skeleton ----------
+async function build(D) {
+  const atlas = new spine.TextureAtlas(D.atlas);
+  for (const page of atlas.pages) {
+    const src = D.pages[page.name] ?? D.pages[page.name.split('/').pop()];
+    if (!src) throw new Error('Missing atlas page image: ' + page.name);
+    page.setTexture(spine.SpineTexture.from(new PIXI.ImageSource({ resource: await loadImg(src) })));
+  }
+  const loader = new spine.AtlasAttachmentLoader(atlas);
+  if (D.json) return new spine.SkeletonJson(loader).readSkeletonData(D.json);
+  return new spine.SkeletonBinary(loader).readSkeletonData(D.skelBytes ?? Uint8Array.from(atob(D.skelB64), c => c.charCodeAt(0)));
+}
+async function use(D, label) {
+  try {
+    $('#err').style.display = 'none'; sd = await build(D);
+    if (sp) { charLayer.removeChild(sp); sp.destroy(); }
+    sp = new spine.Spine({ skeletonData: sd, autoUpdate: true }); charLayer.addChild(sp);
+    sp.state.data.defaultMix = S.mix; sp.state.timeScale = S.paused ? 0 : S.speed;
+    sp.state.addListener({ event: (e, ev) => flash(ev.data.name) });
+    $('#src').textContent = label + ' · Spine runtime 4.3'; place(); renderList();
+    const idle = items().find(i => i.name === SPEC.idle && has(i.name)) || items().find(i => !i.track && has(i.name));
+    if (idle) play(idle); else if (sd.animations[0]) play({ name: sd.animations[0].name, track: 0 });
+    for (const it of items()) if (it.track && it.auto && has(it.name)) toggleLayer(it, true);
+  } catch (e) { console.error(e); $('#err').textContent = 'Load failed:\n' + e.message; $('#err').style.display = 'block'; }
+}
+async function fromFiles(files) {
+  files = [...files]; const D = { pages: {} };
+  for (const f of files) {
+    const n = f.name.toLowerCase();
+    if (n.endsWith('.json')) D.json = JSON.parse(await f.text());
+    else if (n.endsWith('.skel')) D.skelBytes = new Uint8Array(await f.arrayBuffer());
+    else if (n.endsWith('.atlas') || n.endsWith('.atlas.txt')) D.atlas = await f.text();
+    else if (/\.(png|webp|jpe?g)$/.test(n)) D.pages[f.name] = URL.createObjectURL(f);
+  }
+  if (!(D.json || D.skelBytes) || !D.atlas) {          // a single image = background
+    const img = files.find(f => /\.(png|webp|jpe?g)$/i.test(f.name));
+    if (img && files.length === 1) { BG[LAY] = URL.createObjectURL(img); return drawFrame(); }
+    $('#err').textContent = 'Need .json or .skel + .atlas + page .png'; $('#err').style.display = 'block'; return;
+  }
+  use(D, 'files: ' + files.map(f => f.name).join(', '));
+}
+
+// ---------- animations ----------
+const items = () => SPEC.groups.flatMap(g => g.items);
+const has = n => !!(sd && sd.findAnimation(n));
+function entry0() { return sp && sp.state.tracks[0]; }
+function play(it) {
+  if (!sp || !has(it.name)) return;
+  if (it.track) return toggleLayer(it);
+  S.sel = it.name; const loop = it.loop ?? S.loop;
+  sp.state.setAnimation(0, it.name, S.loop || loop === true);
+  if (S.ret && !S.loop && it.name !== SPEC.idle && has(SPEC.idle)) sp.state.addAnimation(0, SPEC.idle, true, 0);
+  renderList(); detail(it);
+}
+const timers = {};
+function fireOnce(it) { sp.state.setAnimation(it.track, it.name, false); sp.state.addEmptyAnimation(it.track, S.mix, 0); }
+function toggleLayer(it, on) {           // loop layer: on/off. one-shot layer (loop:false): fire once; with every:[min,max] it re-fires at random intervals while on
+  on = on ?? !S.layers[it.track]; S.layers[it.track] = on ? it.name : null;
+  clearTimeout(timers[it.track]);
+  if (on) {
+    if (it.loop === false) {
+      fireOnce(it);
+      if (it.every) { const next = () => { timers[it.track] = setTimeout(() => { if (S.layers[it.track] === it.name) { fireOnce(it); next(); } }, 1000 * (it.every[0] + Math.random() * (it.every[1] - it.every[0]))); }; next(); }
+      else S.layers[it.track] = null;
+    } else sp.state.setAnimation(it.track, it.name, true);
+  } else sp.state.setEmptyAnimation(it.track, S.mix);
+  renderList(); detail(it);
+}
+function flash(n) { const d = document.createElement('div'); d.className = 'evp'; d.textContent = '◆ ' + n; $('#evlog').prepend(d); setTimeout(() => d.remove(), 1500); }
+function detail(it) {
+  const a = sd && sd.findAnimation(it.name);
+  $('#detail').innerHTML = `<div class="nm">${it.name}</div><div>${it.what || ''}</div>` +
+    `<div class="w">When: ${it.trigger || '-'} · track ${it.track || 0} · ${it.priority || ''} · ${a ? a.duration.toFixed(2) + 's' : 'to do (not in file)'}${it.loop ? ' · loop' : ''}${it.every ? ' · every ' + it.every.join('–') + 's while on' : ''}</div>`;
+}
+function renderList() {
+  const ready = items().filter(i => has(i.name)).length;
+  $('#title').innerHTML = `${SPEC.title || 'Character'} <span>· animation</span>`;
+  $('#stats').innerHTML = `<b>${ready}</b>/${items().length} ready &nbsp; <b>${sd ? sd.animations.length : 0}</b> anims in file &nbsp; <b>${sd ? sd.bones.length : 0}</b> bones`;
+  const L = $('#list'); L.innerHTML = '';
+  const known = new Set(items().map(i => i.name));
+  const extra = sd ? sd.animations.filter(a => !known.has(a.name)).map(a => ({ name: a.name, trigger: 'in file, not in spec', track: 0 })) : [];
+  const groups = extra.length ? [...SPEC.groups, { group: 'Other (in file)', items: extra }] : SPEC.groups;
+  let n = 0;
+  for (const g of groups) {
+    const vis = g.items.filter(i => S.filter === 'all' || (S.filter === 'ready' ? has(i.name) : S.filter === 'todo' ? !has(i.name) : i.priority === S.filter));
+    if (!vis.length) { n += g.items.length; continue; }
+    const h = document.createElement('div'); h.className = 'grp'; h.textContent = g.group.toUpperCase(); L.append(h);
+    for (const it of g.items) {
+      n++; if (!vis.includes(it)) continue;
+      const d = document.createElement('div'); const act = it.track ? S.layers[it.track] === it.name : S.sel === it.name;
+      d.className = 'it' + (has(it.name) ? '' : ' todo') + (it.track ? ' lay' : '') + (act ? ' sel act' : '');
+      d.innerHTML = `<span class="n">${it.n ?? n}</span><div><div class="nm">${it.name}${it.track ? (act ? ' ●' : ' ○') : ''}</div><div class="tr">${it.trigger || ''}</div></div>` +
+        `<span class="pr ${it.priority || ''}">${it.priority || ''}</span><span class="dot"></span>`;
+      d.onclick = () => { if (has(it.name)) play(it); else detail(it); };
+      L.append(d);
+    }
+  }
+}
+
+// ---------- controls ----------
+const setPause = p => { S.paused = p; if (sp) sp.state.timeScale = p ? 0 : S.speed; $('#play').textContent = p ? '▶ Play' : '❚❚ Pause'; };
+$('#play').onclick = () => setPause(!S.paused);
+addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; if (e.code === 'Space') { e.preventDefault(); setPause(!S.paused); } });
+$('#restart').onclick = () => { const e = entry0(); if (e) e.trackTime = 0; };
+$('#loop').onclick = () => { S.loop = !S.loop; $('#loop').classList.toggle('on', S.loop); const e = entry0(); if (e) e.loop = S.loop; };
+$('#ret').onclick = () => { S.ret = !S.ret; $('#ret').classList.toggle('on', S.ret); };
+$('#speed').oninput = e => { S.speed = +e.target.value; $('#speedv').textContent = S.speed.toFixed(2) + '×'; if (sp && !S.paused) sp.state.timeScale = S.speed; };
+$('#mix').oninput = e => { S.mix = +e.target.value; $('#mixv').textContent = S.mix.toFixed(2) + 's'; if (sp) sp.state.data.defaultMix = S.mix; };
+$('#scrub').addEventListener('pointerdown', () => { S.scrub = true; setPause(true); });
+$('#scrub').addEventListener('pointerup', () => { S.scrub = false; });
+$('#scrub').oninput = e => { const en = entry0(); if (en) { en.trackTime = +e.target.value * en.animation.duration; } };
+$('#cS').oninput = e => { P[LAY].scale = +e.target.value; place(); };
+$('#cSn').onchange = e => { P[LAY].scale = Math.max(0.02, +e.target.value); place(); };
+$('#cX').onchange = e => { P[LAY].x = +e.target.value; place(); };
+$('#cY').onchange = e => { P[LAY].y = +e.target.value; place(); };
+$('#cFlip').onclick = () => { P[LAY].flip = !P[LAY].flip; place(); };
+$('#cReset').onclick = () => { P[LAY] = { ...DEF[LAY] }; place(); };
+$('#cCopy').onclick = () => { const t = JSON.stringify({ layout: LAY, canvas: FR[LAY], feet: { x: Math.round(P[LAY].x), y: Math.round(P[LAY].y) }, scale: +(+P[LAY].scale).toFixed(4), flipX: !!P[LAY].flip }, null, 1); navigator.clipboard?.writeText(t); flash('placement copied'); };
+$('#lyL').onclick = async () => { LAY = 'landscape'; await drawFrame(); place(); fit(); };
+$('#lyP').onclick = async () => { LAY = 'portrait'; await drawFrame(); place(); fit(); };
+
+$('#ldExp').onclick = () => $('#fExp').click(); $('#fExp').onchange = e => fromFiles(e.target.files);
+$('#ldBg').onclick = () => $('#fBg').click(); $('#fBg').onchange = e => { const f = e.target.files[0]; if (f) { BG[LAY] = URL.createObjectURL(f); drawFrame(); } };
+$('#clrBg').onclick = () => { BG[LAY] = null; drawFrame(); };
+for (const b of document.querySelectorAll('#filter button')) b.onclick = () => { S.filter = b.dataset.f; for (const x of document.querySelectorAll('#filter button')) x.classList.toggle('on', x === b); renderList(); };
+// drag character / wheel = size (feet stay put)
+let drag = null;
+app.canvas.addEventListener('pointerdown', e => {
+  if (!sp) return; const r = app.canvas.getBoundingClientRect(), g = { x: e.clientX - r.left, y: e.clientY - r.top };
+  const b = sp.getBounds(); if (g.x < b.x || g.y < b.y || g.x > b.x + b.width || g.y > b.y + b.height) return;
+  drag = { x: e.clientX, y: e.clientY, px: P[LAY].x, py: P[LAY].y }; app.canvas.setPointerCapture(e.pointerId);
+});
+app.canvas.addEventListener('pointermove', e => { if (!drag) return; const k = world.scale.x; P[LAY].x = drag.px + (e.clientX - drag.x) / k; P[LAY].y = drag.py + (e.clientY - drag.y) / k; place(); });
+app.canvas.addEventListener('pointerup', () => drag = null);
+app.canvas.addEventListener('wheel', e => { e.preventDefault(); P[LAY].scale = Math.min(3, Math.max(0.02, P[LAY].scale * (e.deltaY < 0 ? 1.04 : 1 / 1.04))); place(); }, { passive: false });
+// drop files
+const st = $('#stage');
+st.addEventListener('dragover', e => { e.preventDefault(); $('#drop').style.display = 'flex'; });
+st.addEventListener('dragleave', () => $('#drop').style.display = 'none');
+st.addEventListener('drop', e => { e.preventDefault(); $('#drop').style.display = 'none'; fromFiles(e.dataTransfer.files); });
+// time readout
+app.ticker.add(() => {
+  const en = entry0(); if (!en || !en.animation) return;
+  const d = en.animation.duration || 1, t = en.loop ? en.trackTime % d : Math.min(en.trackTime, d);
+  $('#time').textContent = `${t.toFixed(2)} / ${d.toFixed(2)}s`; if (!S.scrub) $('#scrub').value = t / d;
+});
+
+await drawFrame(); fit();
+if (window.SPINE_DATA) use(window.SPINE_DATA, 'baked: data.js'); else { renderList(); $('#src').textContent = 'no data.js · Load export… or drop files'; }
+})();
+</script></body></html>
